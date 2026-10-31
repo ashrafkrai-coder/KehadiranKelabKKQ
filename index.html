@@ -3,16 +3,11 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f4f6fa"><meta name="description" content="Rekod kehadiran Kelab Kelas Kemahiran al-Quran.">
   <link rel="manifest" href="manifest.json"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="dialog.css"><link rel="stylesheet" href="theme.css"><link rel="icon" href="icon.svg" type="image/svg+xml"><title>Hadir KKQ</title>
-  <style>
-    main > .panel { display:block!important; }
-    main > .panel + .panel { border-top:1px solid var(--line); margin-top:12px; }
-    main { padding-bottom:24px; }
-    @media print { main > .panel { display:none!important; } main > #reports { display:block!important; } }
-  </style>
 </head>
 <body>
 <header class="topbar"><div><span class="eyebrow">PENGURUSAN KEHADIRAN KELAB KKQ SMK TAMAN MEDAN</span><h1>Hadir KKQ</h1></div><button id="themeButton" class="icon-button" type="button" aria-label="Aktifkan mod gelap" title="Aktifkan mod gelap"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.9 13.1A8.5 8.5 0 0 1 10.9 3.1 8.5 8.5 0 1 0 20.9 13.1Z"/><path d="M16.5 3.5v3M15 5h3"/></svg></button></header>
 <main>
+<nav class="tabs" aria-label="Navigasi utama"><button class="tab active" data-tab="scan">Imbas</button><button class="tab" data-tab="students">Murid</button><button class="tab" data-tab="dashboard">Hari ini</button><button class="tab" data-tab="reports">Laporan</button><button class="tab" data-tab="settings">Tetapan</button></nav>
 <section id="scan" class="panel active"><div class="section-heading"><div><span class="eyebrow">SESI KEHADIRAN</span><h2>Imbas murid</h2></div><span id="syncBadge" class="badge status-indicator" role="status" aria-label="Menyemak sambungan" title="Menyemak sambungan"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20M8.5 8.5A6 6 0 0 1 15.5 8M5 12.55a11 11 0 0 1 3.2-1.7M1.42 9a16 16 0 0 1 4.2-2.8M14 14a6 6 0 0 1 2.3 2.1M18.4 11.8a11 11 0 0 1 4.2 2.6"/></svg></span></div>
 <div class="grid session-fields"><label>Tarikh<input id="sessionDate" type="date"></label><label>Perjumpaan ke<select id="occurrence"></select></label></div>
 <div class="camera-card"><video id="video" autoplay muted playsinline></video><div id="cameraMessage" class="camera-message">Kamera belum dimulakan. Daftar muka sekurang-kurangnya 3 sampel dahulu.</div><div class="camera-actions"><button id="startCamera" class="primary">Mula kamera</button><button id="stopCamera" class="secondary" disabled>Henti</button></div></div>
