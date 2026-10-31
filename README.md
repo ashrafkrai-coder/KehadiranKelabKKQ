@@ -19,11 +19,10 @@ Konfigurasi lalai kamera ialah 5 wajah, 720p, input 416, ambang jarak 0.48 dan d
 3. Jalankan `setupSheets` sekali daripada editor dan benarkan akses. Skema aktif aplikasi ialah:
    - **Senarai**: `Nama`, `Kelas`, `ID` (ID pilihan). Aplikasi hanya memuatkan nama dan kelas.
    - **Kehadiran**: `Tahun`, `Tarikh`, `Jenis Aktiviti`, `Nama Aktiviti`, `Perjumpaan`, `Kelas`, `Nama Murid`, `Status`, `Sebab`, `Kunci Rekod`, `Dikemas kini`. Aktiviti baharu ditetapkan sebagai `Kemahiran al-Quran` / `Kelas Kemahiran al-Quran`.
-   - **Aktiviti**: `Nama Aktiviti`, `Jenis`, `Status`; baris aktif KKQ ditambah jika belum ada.
-   - **Murid** menggunakan lajur `Nama`, `Kelas`, `ID` dan `Dikemas kini`. Jalankan `setupSheets`; lajur legacy `Kumpulan al-Quran`, `Kelab` dan `Persatuan` dibuang daripada tab ini.
-   - **Kelab** dan **Log** dikekalkan untuk keserasian atau rekod operasi; aplikasi semasa menetapkan `Kemahiran al-Quran` / `Kelas Kemahiran al-Quran` secara tetap dan tidak memerlukan pilihan kelab atau aktiviti tambahan pada skrin.
+   - **Log**: `Masa`, `Tahap`, `Mesej` untuk rekod operasi Apps Script.
+   - Tab legacy `Murid`, `Kelab` dan `Aktiviti` dibuang semasa `setupSheets`.
 
-   Fungsi ini mencipta tab hilang dan melengkapkan tajuk yang kosong sahaja. Lajur legacy Kumpulan al-Quran, Kelab dan Persatuan pada tab **Murid** dibuang apabila `setupSheets` dijalankan; rekod pada lajur lain dikekalkan. Semak tab **Senarai** supaya setiap baris murid mempunyai nama dan kelas yang betul.
+   Fungsi ini mencipta hanya tab berkaitan `Senarai`, `Kehadiran` dan `Log`, serta memadam tab legacy `Murid`, `Kelab` dan `Aktiviti`. Semak tab **Senarai** supaya setiap baris murid mempunyai nama dan kelas yang betul.
 4. **Deploy → New deployment → Web app**, jalankan sebagai akaun pemilik Sheet, pilih akses yang membenarkan peranti guru mengakses endpoint, dan deploy. Salin URL HTTPS `/exec` ke Tetapan. URL `/dev` akan dinormalisasi ke `/exec`.
 5. Eksport tab **Senarai** sebagai CSV dengan tajuk sekurang-kurangnya `Nama` dan `Kelas` untuk import murid. Import memadankan gabungan nama dan kelas; baris yang sepadan tidak mengganti data sedia ada.
 

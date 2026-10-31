@@ -3,10 +3,7 @@ const APP_ACTIVITY = 'Kemahiran al-Quran';
 const APP_ACTIVITY_NAME = 'Kelas Kemahiran al-Quran';
 const SHEETS = {
   'Senarai': ['Nama', 'Kelas', 'ID'],
-  'Murid': ['Nama', 'Kelas', 'ID', 'Dikemas kini'],
   'Kehadiran': ['Tahun', 'Tarikh', 'Jenis Aktiviti', 'Nama Aktiviti', 'Perjumpaan', 'Kelas', 'Nama Murid', 'Status', 'Sebab', 'Kunci Rekod', 'Dikemas kini'],
-  'Kelab': ['Nama Kelab / Persatuan', 'Status'],
-  'Aktiviti': ['Nama Aktiviti', 'Jenis', 'Status'],
   'Log': ['Masa', 'Tahap', 'Mesej']
 };
 function doGet(e) { return output_({ ok: true, service: 'Hadir KKQ', version: 1 }); }
@@ -45,13 +42,12 @@ function normalizeRow_(r) {
   return { tahun: year, tarikh: date, jenisAktiviti: activity, namaAktiviti, perjumpaan: n, kelas: clean_(r.kelas, 50), nama: clean_(r.nama, 100), status, sebab: clean_(r.sebab, 300), dikemasKini: new Date().toISOString() };
 }
 function clean_(value, max) { return String(value == null ? '' : value).replace(/<[^>]*>/g, '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); }
-function normalizeActivity_(v) { const s = clean_(v, 80).toLocaleLowerCase(); if (/quran|qur.?an|kemahiran/.test(s)) return 'Kemahiran al-Quran'; if (/kelab|persatuan/.test(s)) return 'Kelab dan Persatuan'; return ''; }
+function normalizeActivity_(v) { const s = clean_(v, 80).toLocaleLowerCase(); return /quran|qur.?an|kemahiran/.test(s) ? APP_ACTIVITY : ''; }
 function sessionKey_(r) { return [r.tahun, r.tarikh, r.jenisAktiviti, r.namaAktiviti.toLocaleLowerCase(), r.perjumpaan, r.kelas.toLocaleLowerCase(), r.nama.toLocaleLowerCase()].join('|'); }
 /** Creates missing sheets. Existing header updates affect row 1 only and never clear data rows. */
 function ensureSheets_(ss) {
   Object.keys(SHEETS).forEach(name => {
     let sh = ss.getSheetByName(name); if (!sh) sh = ss.insertSheet(name);
-    if (name === 'Murid') removeLegacyStudentColumns_(sh);
     const expected = SHEETS[name], width = Math.max(expected.length, sh.getLastColumn(), 1);
     const old = sh.getRange(1, 1, 1, width).getDisplayValues()[0];
     const headers = expected.map((h, i) => old[i] && String(old[i]).trim() ? old[i] : h);
@@ -59,29 +55,14 @@ function ensureSheets_(ss) {
     expected.forEach((h, i) => { if (!headers[i]) headers[i] = h; });
     sh.getRange(1, 1, 1, headers.length).setValues([headers]); sh.setFrozenRows(1);
   });
-  ensureDefaultActivity_(ss);
+  removeLegacySheets_(ss);
 }
-function removeLegacyStudentColumns_(sh) {
-  const lastColumn = sh.getLastColumn();
-  if (lastColumn < 1) return;
-  const headers = sh.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
-  const columns = [];
-  headers.forEach((header, index) => {
-    const label = clean_(header, 100).toLocaleLowerCase('ms');
-    if (/kelab|persatuan/.test(label) || /kumpulan.*(quran|al.?quran)/.test(label)) columns.push(index + 1);
+function removeLegacySheets_(ss) {
+  ['Kelab', 'Aktiviti', 'Murid'].forEach(name => {
+    const sh = ss.getSheetByName(name);
+    if (sh && ss.getSheets().length > 1) ss.deleteSheet(sh);
   });
-  columns.sort((a, b) => b - a).forEach(column => sh.deleteColumn(column));
 }
-function ensureDefaultActivity_(ss) {
-  const sh = ss.getSheetByName('Aktiviti');
-  const values = sh.getDataRange().getDisplayValues();
-  const headers = (values.shift() || []).map(x => String(x).trim().toLocaleLowerCase());
-  const nameIndex = headers.findIndex(x => /nama aktiviti/.test(x));
-  const activityColumn = nameIndex >= 0 ? nameIndex : 0;
-  const expectedName = APP_ACTIVITY_NAME.toLocaleLowerCase();
-  const found = values.some(row => String(row[activityColumn] || '').trim().toLocaleLowerCase() === expectedName);
-  if (!found) sh.appendRow([APP_ACTIVITY_NAME, APP_ACTIVITY, 'Aktif']);
-}
-function setupSheets() { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); log_(ss, 'INFO', 'Struktur sheet disediakan. Lajur Murid legacy KKQ dibuang. Aktiviti aktif KKQ ditambah jika belum wujud.'); }
+function setupSheets() { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); log_(ss, 'INFO', 'Struktur sheet KKQ disediakan. Tab Kelab, Aktiviti dan Murid legacy dibuang.'); }
 function log_(ss, level, message) { const sh = ss.getSheetByName('Log'); if (sh) sh.appendRow([new Date(), level, clean_(message, 400)]); }
 function output_(data) { return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }
