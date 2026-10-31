@@ -1,7 +1,9 @@
 /** Hadir KKQ Google Apps Script endpoint. Deploy as Web App, execute as owner. */
+const APP_ACTIVITY = 'Kemahiran al-Quran';
+const APP_ACTIVITY_NAME = 'Kelas Kemahiran al-Quran';
 const SHEETS = {
-  'Senarai': ['Nama', 'Kelas', 'Kelab', 'Kumpulan al-Quran', 'ID'],
-  'Murid': ['Nama', 'Kelas', 'Kelab', 'Kumpulan al-Quran', 'ID', 'Dikemas kini'],
+  'Senarai': ['Nama', 'Kelas', 'ID'],
+  'Murid': ['Nama', 'Kelas', 'ID', 'Dikemas kini'],
   'Kehadiran': ['Tahun', 'Tarikh', 'Jenis Aktiviti', 'Nama Aktiviti', 'Perjumpaan', 'Kelas', 'Nama Murid', 'Status', 'Sebab', 'Kunci Rekod', 'Dikemas kini'],
   'Kelab': ['Nama Kelab / Persatuan', 'Status'],
   'Aktiviti': ['Nama Aktiviti', 'Jenis', 'Status'],
@@ -13,7 +15,7 @@ function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (!tokenValid_(payload.token)) throw new Error('Token tidak sah.');
-    if (payload.action === 'students') { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); const sh = ss.getSheetByName('Senarai'); const values = sh.getDataRange().getDisplayValues(); const headers = values.shift().map(x => String(x).trim().toLocaleLowerCase()); const ni = headers.findIndex(x => /nama/.test(x)), ci = headers.findIndex(x => /kelas|tingkatan/.test(x)), ki = headers.findIndex(x => /kelab/.test(x)), qi = headers.findIndex(x => /quran/.test(x)); if (ni < 0 || ci < 0) throw new Error('Tab Senarai perlu mempunyai lajur Nama dan Kelas.'); const students = values.filter(row => row[ni] && row[ci]).map(row => ({ nama: clean_(row[ni], 100), kelas: clean_(row[ci], 50), kelab: ki >= 0 ? clean_(row[ki], 300) : '', quran: qi >= 0 ? clean_(row[qi], 100) : '' })); return output_({ ok: true, students }); }
+    if (payload.action === 'students') { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); const sh = ss.getSheetByName('Senarai'); const values = sh.getDataRange().getDisplayValues(); const headers = values.shift().map(x => String(x).trim().toLocaleLowerCase()); const ni = headers.findIndex(x => /nama/.test(x)), ci = headers.findIndex(x => /kelas|tingkatan/.test(x)), ii = headers.findIndex(x => /^id$/.test(x)); if (ni < 0 || ci < 0) throw new Error('Tab Senarai perlu mempunyai lajur Nama dan Kelas.'); const students = values.filter(row => row[ni] && row[ci]).map(row => ({ nama: clean_(row[ni], 100), kelas: clean_(row[ci], 50), id: ii >= 0 ? clean_(row[ii], 100) : '' })); return output_({ ok: true, students }); }
     if (payload.action !== 'attendance' || !Array.isArray(payload.rows)) throw new Error('Permintaan tidak sah.');
     if (payload.rows.length > 500) throw new Error('Maksimum 500 rekod setiap permintaan.');
     lock.waitLock(20000);
@@ -39,7 +41,8 @@ function normalizeRow_(r) {
   const date = String(r.tarikh || '').slice(0, 10), year = Number(r.tahun) || Number(date.slice(0, 4)), activity = normalizeActivity_(r.jenisAktiviti);
   const n = Number(r.perjumpaan), status = String(r.status || '').toUpperCase().trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !year || !activity || !Number.isInteger(n) || n < 1 || n > 12 || !['H', 'T', 'TS'].includes(status)) throw new Error('Medan tarikh, aktiviti, perjumpaan atau status tidak sah.');
-  return { tahun: year, tarikh: date, jenisAktiviti: activity, namaAktiviti: clean_(r.namaAktiviti, 100), perjumpaan: n, kelas: clean_(r.kelas, 50), nama: clean_(r.nama, 100), status, sebab: clean_(r.sebab, 300), dikemasKini: new Date().toISOString() };
+  const namaAktiviti = activity === APP_ACTIVITY ? APP_ACTIVITY_NAME : clean_(r.namaAktiviti, 100);
+  return { tahun: year, tarikh: date, jenisAktiviti: activity, namaAktiviti, perjumpaan: n, kelas: clean_(r.kelas, 50), nama: clean_(r.nama, 100), status, sebab: clean_(r.sebab, 300), dikemasKini: new Date().toISOString() };
 }
 function clean_(value, max) { return String(value == null ? '' : value).replace(/<[^>]*>/g, '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); }
 function normalizeActivity_(v) { const s = clean_(v, 80).toLocaleLowerCase(); if (/quran|qur.?an|kemahiran/.test(s)) return 'Kemahiran al-Quran'; if (/kelab|persatuan/.test(s)) return 'Kelab dan Persatuan'; return ''; }
@@ -55,7 +58,18 @@ function ensureSheets_(ss) {
     expected.forEach((h, i) => { if (!headers[i]) headers[i] = h; });
     sh.getRange(1, 1, 1, headers.length).setValues([headers]); sh.setFrozenRows(1);
   });
+  ensureDefaultActivity_(ss);
 }
-function setupSheets() { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); log_(ss, 'INFO', 'Struktur sheet disediakan tanpa memadam rekod.'); }
+function ensureDefaultActivity_(ss) {
+  const sh = ss.getSheetByName('Aktiviti');
+  const values = sh.getDataRange().getDisplayValues();
+  const headers = (values.shift() || []).map(x => String(x).trim().toLocaleLowerCase());
+  const nameIndex = headers.findIndex(x => /nama aktiviti/.test(x));
+  const activityColumn = nameIndex >= 0 ? nameIndex : 0;
+  const expectedName = APP_ACTIVITY_NAME.toLocaleLowerCase();
+  const found = values.some(row => String(row[activityColumn] || '').trim().toLocaleLowerCase() === expectedName);
+  if (!found) sh.appendRow([APP_ACTIVITY_NAME, APP_ACTIVITY, 'Aktif']);
+}
+function setupSheets() { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); log_(ss, 'INFO', 'Struktur sheet disediakan tanpa memadam rekod lama. Aktiviti aktif KKQ ditambah jika belum wujud.'); }
 function log_(ss, level, message) { const sh = ss.getSheetByName('Log'); if (sh) sh.appendRow([new Date(), level, clean_(message, 400)]); }
 function output_(data) { return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }
