@@ -1,0 +1,10 @@
+﻿'use strict';
+const test = require('node:test'); const assert = require('node:assert/strict'); const u = require('../appUtils.js');
+test('sanitize strips markup and controls', () => assert.equal(u.sanitize('<b>Aina</b><script>alert(1)</script>'), 'Ainaalert(1)'));
+test('Apps Script dev URL normalizes to exec and rejects non Google HTTPS', () => { assert.match(u.execUrl('https://script.google.com/macros/s/abc/dev'), /\/exec$/); assert.equal(u.execUrl('http://script.google.com/macros/s/a/exec'), ''); });
+test('Sheet matching uses both normalized name and class', () => { const list = [{ nama: 'Ali', kelas: '1 Amanah', id: 1 }, { nama: 'Ali', kelas: '2 Amanah', id: 2 }]; assert.equal(u.matchSheetStudent({ nama: ' ali ', kelas: '2 AMANAH' }, list).id, 2); assert.equal(u.matchSheetStudent({ nama: 'Ali', kelas: '3 Amanah' }, list), null); });
+test('attendance status validates H/T/TS only', () => { for (const s of ['H', 'T', 'TS']) assert.equal(u.validateAttendanceStatus(s), s); assert.equal(u.validateAttendanceStatus('hadir'), ''); });
+test('percentage and summary calculate correctly', () => { assert.equal(u.calculatePercentage(9, 12), 75); assert.deepEqual(u.calculateAttendanceSummary(['H', 'H', 'T', 'TS'], 4), { sessions: ['H', 'H', 'T', 'TS'], hadir: 2, tidakHadir: 1, tidakHadirSebab: 1, peratus: 50 }); });
+test('occurrence is bounded to 1 through 12', () => { assert.equal(u.lateOccurrence(1), 1); assert.equal(u.lateOccurrence(12), 12); assert.equal(u.lateOccurrence(13), null); });
+test('invalid camera settings reset to stable defaults', () => { const s = u.sanitizeSettings({ maxFaces: 7, resolution: '4k', inputSize: 300 }); assert.equal(s.maxFaces, 5); assert.equal(s.resolution, '720p'); assert.equal(s.inputSize, 416); });
+test('deployed URL is configured and token is not bundled by default', () => { const s = u.sanitizeSettings({}); assert.equal(s.scriptUrl, 'https://script.google.com/macros/s/AKfycbxIOXopkqcSsipSub0h1gRCZisqkvtmvHOnGENLj6AWx-vnVRi1fSg28VwTu90boz_K/exec'); assert.equal(s.token, ''); });

@@ -15,7 +15,7 @@ Konfigurasi lalai kamera ialah 5 wajah, 720p, input 416, ambang jarak 0.48 dan d
 ## Apps Script dan Google Sheet
 
 1. Buat atau buka Google Sheet khusus aplikasi dan buka **Extensions → Apps Script**. Salin kandungan `Code.gs` ke projek Apps Script yang terikat kepada Sheet.
-2. Token rawak sudah diletakkan dalam `Code.gs` dan `appUtils.js`. Terbitkan semula kedua-dua bahagian. Oleh sebab token frontend boleh dilihat oleh pelawat laman, gunakan Script Properties dan jangan bundelkan token frontend jika perlukan kawalan akses sulit.
+2. Di **Project Settings → Script properties**, tetapkan `HADIR_TOKEN` kepada token rawak yang hanya anda simpan. Masukkan nilai yang sama pada Tetapan aplikasi setiap peranti guru. Token tidak disimpan dalam repository atau bundle frontend.
 3. Jalankan `setupSheets` sekali daripada editor dan benarkan akses. Ia menyediakan tab Senarai, Murid, Kehadiran, Kelab, Aktiviti dan Log. Ia mencipta tab hilang dan mengisi label tajuk sahaja; data baris lama tidak dipadam.
 4. **Deploy → New deployment → Web app**, jalankan sebagai akaun pemilik Sheet, pilih akses yang membenarkan peranti guru mengakses endpoint, dan deploy. Salin URL HTTPS `/exec` ke Tetapan. URL `/dev` akan dinormalisasi ke `/exec`.
 5. Eksport tab **Senarai** sebagai CSV dengan tajuk sekurang-kurangnya `Nama` dan `Kelas` untuk import murid. Import memadankan gabungan nama dan kelas; baris yang sepadan tidak mengganti data sedia ada.

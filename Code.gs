@@ -7,8 +7,6 @@ const SHEETS = {
   'Aktiviti': ['Nama Aktiviti', 'Jenis', 'Status'],
   'Log': ['Masa', 'Tahap', 'Mesej']
 };
-// Shared with appUtils.js; this token is visible in the published frontend bundle.
-const HADIR_TOKEN = 'Y_wNJYIMww9GhwFnp3m_m7AXHWibvDJc8iqvONkEomQ';
 function doGet(e) { return output_({ ok: true, service: 'Hadir KKQ', version: 1 }); }
 function doPost(e) {
   const lock = LockService.getScriptLock();
@@ -36,7 +34,7 @@ function doPost(e) {
     return output_({ ok: false, error: String(err.message || err) });
   } finally { try { lock.releaseLock(); } catch (_) {} }
 }
-function tokenValid_(token) { return String(token || '') === HADIR_TOKEN; }
+function tokenValid_(token) { const expected = PropertiesService.getScriptProperties().getProperty('HADIR_TOKEN'); return !!expected && String(token || '') === expected; }
 function normalizeRow_(r) {
   const date = String(r.tarikh || '').slice(0, 10), year = Number(r.tahun) || Number(date.slice(0, 4)), activity = normalizeActivity_(r.jenisAktiviti);
   const n = Number(r.perjumpaan), status = String(r.status || '').toUpperCase().trim();
