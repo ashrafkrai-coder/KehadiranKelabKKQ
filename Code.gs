@@ -51,6 +51,7 @@ function sessionKey_(r) { return [r.tahun, r.tarikh, r.jenisAktiviti, r.namaAkti
 function ensureSheets_(ss) {
   Object.keys(SHEETS).forEach(name => {
     let sh = ss.getSheetByName(name); if (!sh) sh = ss.insertSheet(name);
+    if (name === 'Murid') removeLegacyStudentColumns_(sh);
     const expected = SHEETS[name], width = Math.max(expected.length, sh.getLastColumn(), 1);
     const old = sh.getRange(1, 1, 1, width).getDisplayValues()[0];
     const headers = expected.map((h, i) => old[i] && String(old[i]).trim() ? old[i] : h);
@@ -59,6 +60,17 @@ function ensureSheets_(ss) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]); sh.setFrozenRows(1);
   });
   ensureDefaultActivity_(ss);
+}
+function removeLegacyStudentColumns_(sh) {
+  const lastColumn = sh.getLastColumn();
+  if (lastColumn < 1) return;
+  const headers = sh.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+  const columns = [];
+  headers.forEach((header, index) => {
+    const label = clean_(header, 100).toLocaleLowerCase('ms');
+    if (/kelab|persatuan/.test(label) || /kumpulan.*(quran|al.?quran)/.test(label)) columns.push(index + 1);
+  });
+  columns.sort((a, b) => b - a).forEach(column => sh.deleteColumn(column));
 }
 function ensureDefaultActivity_(ss) {
   const sh = ss.getSheetByName('Aktiviti');
@@ -70,6 +82,6 @@ function ensureDefaultActivity_(ss) {
   const found = values.some(row => String(row[activityColumn] || '').trim().toLocaleLowerCase() === expectedName);
   if (!found) sh.appendRow([APP_ACTIVITY_NAME, APP_ACTIVITY, 'Aktif']);
 }
-function setupSheets() { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); log_(ss, 'INFO', 'Struktur sheet disediakan tanpa memadam rekod lama. Aktiviti aktif KKQ ditambah jika belum wujud.'); }
+function setupSheets() { const ss = SpreadsheetApp.getActiveSpreadsheet(); ensureSheets_(ss); log_(ss, 'INFO', 'Struktur sheet disediakan. Lajur Murid legacy KKQ dibuang. Aktiviti aktif KKQ ditambah jika belum wujud.'); }
 function log_(ss, level, message) { const sh = ss.getSheetByName('Log'); if (sh) sh.appendRow([new Date(), level, clean_(message, 400)]); }
 function output_(data) { return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }

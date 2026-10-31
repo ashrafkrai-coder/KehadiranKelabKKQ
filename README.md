@@ -20,9 +20,10 @@ Konfigurasi lalai kamera ialah 5 wajah, 720p, input 416, ambang jarak 0.48 dan d
    - **Senarai**: `Nama`, `Kelas`, `ID` (ID pilihan). Aplikasi hanya memuatkan nama dan kelas.
    - **Kehadiran**: `Tahun`, `Tarikh`, `Jenis Aktiviti`, `Nama Aktiviti`, `Perjumpaan`, `Kelas`, `Nama Murid`, `Status`, `Sebab`, `Kunci Rekod`, `Dikemas kini`. Aktiviti baharu ditetapkan sebagai `Kemahiran al-Quran` / `Kelas Kemahiran al-Quran`.
    - **Aktiviti**: `Nama Aktiviti`, `Jenis`, `Status`; baris aktif KKQ ditambah jika belum ada.
-   - **Murid**, **Kelab** dan **Log** dikekalkan untuk keserasian atau rekod operasi; aplikasi semasa menetapkan `Kemahiran al-Quran` / `Kelas Kemahiran al-Quran` secara tetap dan tidak memerlukan pilihan kelab atau aktiviti tambahan pada skrin.
+   - **Murid** menggunakan lajur `Nama`, `Kelas`, `ID` dan `Dikemas kini`. Jalankan `setupSheets`; lajur legacy `Kumpulan al-Quran`, `Kelab` dan `Persatuan` dibuang daripada tab ini.
+   - **Kelab** dan **Log** dikekalkan untuk keserasian atau rekod operasi; aplikasi semasa menetapkan `Kemahiran al-Quran` / `Kelas Kemahiran al-Quran` secara tetap dan tidak memerlukan pilihan kelab atau aktiviti tambahan pada skrin.
 
-   Fungsi ini mencipta tab hilang dan melengkapkan tajuk yang kosong sahaja. Tajuk/lajur lama dan semua rekod sedia ada dikekalkan; ia tidak memadam atau menyusun semula data. Semak tab **Senarai** supaya setiap baris murid mempunyai nama dan kelas yang betul.
+   Fungsi ini mencipta tab hilang dan melengkapkan tajuk yang kosong sahaja. Lajur legacy Kumpulan al-Quran, Kelab dan Persatuan pada tab **Murid** dibuang apabila `setupSheets` dijalankan; rekod pada lajur lain dikekalkan. Semak tab **Senarai** supaya setiap baris murid mempunyai nama dan kelas yang betul.
 4. **Deploy → New deployment → Web app**, jalankan sebagai akaun pemilik Sheet, pilih akses yang membenarkan peranti guru mengakses endpoint, dan deploy. Salin URL HTTPS `/exec` ke Tetapan. URL `/dev` akan dinormalisasi ke `/exec`.
 5. Eksport tab **Senarai** sebagai CSV dengan tajuk sekurang-kurangnya `Nama` dan `Kelas` untuk import murid. Import memadankan gabungan nama dan kelas; baris yang sepadan tidak mengganti data sedia ada.
 
