@@ -1,0 +1,1 @@
+{"name":"hadir-kkq","version":"1.0.0","private":true,"description":"PWA rekod kehadiran Kelab, Persatuan dan Kemahiran al-Quran","scripts":{"test":"node --test tests/*.test.js","check":"node --check app.js && node --check appUtils.js"},"engines":{"node":">=18"}}
