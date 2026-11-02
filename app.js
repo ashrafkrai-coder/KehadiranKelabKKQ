@@ -1,7 +1,7 @@
 ﻿(() => {
   'use strict';
   const U = window.AttendanceUtils, $ = id => document.getElementById(id), DB = 'hadir-kkq-local', STORE = 'data', ACTIVITY = 'Kemahiran al-Quran', ACTIVITY_NAME = 'Kelas Kemahiran al-Quran';
-  let db, stream, scanning = false, modelReady = false, lastSeen = new Map();
+  let db, stream, faceRegistrationStream, scanning = false, modelReady = false, lastSeen = new Map();
   const memory = { students: [], records: [], queue: [], settings: U.sanitizeSettings() };
   const openDb = () => new Promise((resolve, reject) => { if (!indexedDB) return reject(Error('IndexedDB tidak tersedia')); const req = indexedDB.open(DB, 1); req.onupgradeneeded = () => req.result.createObjectStore(STORE); req.onsuccess = () => { db = req.result; resolve(db); }; req.onerror = () => reject(req.error); });
   const get = key => new Promise((resolve, reject) => { if (!db) return resolve(memory[key]); const r = db.transaction(STORE).objectStore(STORE).get(key); r.onsuccess = () => resolve(r.result ?? memory[key]); r.onerror = () => reject(r.error); });
@@ -39,7 +39,7 @@
     const selected = filter.value.toLocaleLowerCase('ms'), filtered = students.filter(s => (!query || `${s.nama} ${s.kelas}`.toLocaleLowerCase('ms').includes(query)) && (!selected || s.kelas.toLocaleLowerCase('ms') === selected));
     const displayClass = value => preferred.find(c => c.toLocaleLowerCase('ms') === value.trim().toLocaleLowerCase('ms')) || value.trim();
     const groups = new Map(); filtered.forEach(s => { const name = displayClass(s.kelas); if (!groups.has(name)) groups.set(name, []); groups.get(name).push(s); });
-    const rows = group => group.sort((a, b) => a.nama.localeCompare(b.nama, 'ms', { sensitivity: 'base' })).map(s => `<article class="student-row"><div><strong>${esc(s.nama)}</strong><span class="muted">${esc(s.kelas)} · ${s.descriptors?.length ? `${s.descriptors.length} sampel muka` : 'Muka belum didaftar'}</span></div><div class="row-actions"><button class="secondary" data-face="${esc(id(s))}">${s.descriptors?.length ? 'Daftar semula muka' : 'Daftar muka'}</button>${s.descriptors?.length ? `<button class="secondary" data-deleteface="${esc(id(s))}">Padam muka</button>` : ''}</div></article>`).join('');
+    const rows = group => group.sort((a, b) => a.nama.localeCompare(b.nama, 'ms', { sensitivity: 'base' })).map(s => `<article class="student-row"><div class="student-face"><div class="student-avatar">${s.photos?.[0] ? `<img src="${s.photos[0]}" alt="Foto ${esc(s.nama)}">` : '<span>?</span>'}</div><div><strong>${esc(s.nama)}</strong><span class="muted">${esc(s.kelas)} · ${s.descriptors?.length ? `${s.descriptors.length} sampel muka` : 'Muka belum didaftar'}</span></div></div><div class="row-actions"><button class="secondary" data-face="${esc(id(s))}">${s.descriptors?.length ? 'Daftar semula muka' : 'Daftar muka'}</button>${s.descriptors?.length ? `<button class="secondary" data-deleteface="${esc(id(s))}">Padam muka</button>` : ''}</div></article>`).join('');
     const sortedGroups = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, 'ms', { numeric: true, sensitivity: 'base' }));
     $('studentList').innerHTML = sortedGroups.map(([kelas, group]) => `<section class="class-group"><h3>${esc(kelas)} <span class="muted">(${group.length} murid)</span></h3><div class="results">${rows(group)}</div></section>`).join('') || '<p class="muted">Tiada murid ditemui.</p>';
   }
@@ -49,7 +49,57 @@
   async function detectLoop() { if (!scanning) return; const s = await get('settings'); try { const det = await faceapi.detectAllFaces($('video'), new faceapi.TinyFaceDetectorOptions({ inputSize: s.inputSize, scoreThreshold: .5 })).withFaceLandmarks().withFaceDescriptors(); const students = (await get('students') || []).filter(x => x.descriptors?.length); if (!det.length) $('cameraMessage').textContent = 'Tiada wajah dikesan. Lihat kamera dan tambah pencahayaan.'; else { $('cameraMessage').textContent = `${det.length} wajah dikesan`; const candidates = students.map(st => ({ student: st, descriptors: st.descriptors.map(d => new Float32Array(d)) })); for (const face of det.slice(0, s.maxFaces)) { const distances = candidates.map(c => ({ ...c, d: Math.min(...c.descriptors.map(d => faceapi.euclideanDistance(face.descriptor, d))) })).sort((a, b) => a.d - b.d); if (!distances.length || distances[0].d > s.threshold || (distances[1] && distances[1].d - distances[0].d < s.margin)) continue; const who = distances[0].student, key = id(who), count = (lastSeen.get(key)?.count || 0) + 1; lastSeen.set(key, { count, at: Date.now() }); if (count >= s.confirmations && Date.now() - (lastSeen.get(key)?.saved || 0) > 30000) { lastSeen.set(key, { count: 0, at: Date.now(), saved: Date.now() }); await addRecord(who, 'H'); } } } } catch (e) { $('cameraMessage').textContent = `Ralat pengesanan: ${e.message}`; } setTimeout(detectLoop, 700); }
   function chooseSampleCount() { const dialog = $('sampleDialog'); if (!dialog.showModal) return Promise.resolve(3); return new Promise(resolve => { const onClose = () => { dialog.removeEventListener('close', onClose); resolve(dialog.returnValue === 'start' ? Number($('sampleCount').value) : null); }; $('sampleCount').value = '3'; dialog.addEventListener('close', onClose); dialog.showModal(); }); }
   function askAbsenceReason() { const dialog = $('reasonDialog'); if (!dialog.showModal) return Promise.resolve(null); return new Promise(resolve => { const onClose = () => { dialog.removeEventListener('close', onClose); resolve(dialog.returnValue === 'save' ? U.sanitize($('absenceReason').value, 300) : null); }; $('absenceReason').value = ''; dialog.addEventListener('close', onClose); dialog.showModal(); }); }
-  async function registerFace(studentKey) { try { const count = await chooseSampleCount(); if (!count) return; await photoFreeModels(); if (!stream) { await startCamera(); if (!stream) return; } const descriptors = []; $('cameraMessage').textContent = 'Pandang kamera dan kekal pada jarak sesuaiâ€¦'; while (descriptors.length < count) { await new Promise(r => setTimeout(r, 900)); const d = await faceapi.detectSingleFace($('video'), new faceapi.TinyFaceDetectorOptions({ inputSize: (await get('settings')).inputSize })).withFaceLandmarks().withFaceDescriptor(); if (d) { descriptors.push(Array.from(d.descriptor)); $('cameraMessage').textContent = `Sampel ${descriptors.length}/${count} dirakam. Gerakkan kepala sedikit.`; } else $('cameraMessage').textContent = 'Wajah tidak dikesan, laraskan kedudukan dan cahaya.'; } const list = await get('students'), st = list.find(x => id(x) === studentKey); st.descriptors = descriptors; await put('students', list); renderStudents(); toast(`${st.nama}: muka didaftarkan (${count} sampel).`); } catch (e) { toast(`Gagal daftar muka: ${e.message}`); } }
+  function stopFaceRegistrationCamera() { if (faceRegistrationStream) faceRegistrationStream.getTracks().forEach(t => t.stop()); faceRegistrationStream = null; $('faceVideo').srcObject = null; }
+  function captureFacePhoto() {
+    const video = $('faceVideo'), canvas = $('faceCaptureCanvas'), width = 480, height = Math.round(width * (video.videoHeight || 360) / (video.videoWidth || 640));
+    canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', .72);
+  }
+  async function registerFace(studentKey) {
+    const count = await chooseSampleCount();
+    if (!count) return;
+    const dialog = $('faceRegistrationDialog');
+    const descriptors = [], photos = [];
+    $('faceSnapshots').innerHTML = '';
+    try {
+      await photoFreeModels();
+      if (!navigator.mediaDevices?.getUserMedia) throw Error('Kamera memerlukan HTTPS atau localhost.');
+      faceRegistrationStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      $('faceVideo').srcObject = faceRegistrationStream;
+      await $('faceVideo').play();
+      dialog.showModal();
+      $('faceRegistrationStatus').textContent = 'Pandang kamera dan kekal pada jarak sesuai...';
+      while (descriptors.length < count && dialog.open) {
+        await new Promise(r => setTimeout(r, 900));
+        if (!dialog.open) break;
+        const settings = await get('settings');
+        const d = await faceapi.detectSingleFace($('faceVideo'), new faceapi.TinyFaceDetectorOptions({ inputSize: settings.inputSize })).withFaceLandmarks().withFaceDescriptor();
+        if (d) {
+          descriptors.push(Array.from(d.descriptor));
+          const photo = captureFacePhoto();
+          photos.push(photo);
+          $('faceSnapshots').insertAdjacentHTML('beforeend', `<img src="${photo}" alt="Sampel ${descriptors.length}">`);
+          $('faceRegistrationStatus').textContent = `Sampel ${descriptors.length}/${count} diambil automatik. Gerakkan kepala sedikit.`;
+        } else {
+          $('faceRegistrationStatus').textContent = 'Wajah tidak dikesan. Laraskan kedudukan dan cahaya.';
+        }
+      }
+      if (descriptors.length !== count) return;
+      const list = await get('students'), st = list.find(x => id(x) === studentKey);
+      st.descriptors = descriptors;
+      st.photos = photos;
+      await put('students', list);
+      await renderStudents();
+      stopFaceRegistrationCamera();
+      dialog.close();
+      toast(`${st.nama}: ${count} gambar dan data muka disimpan.`);
+    } catch (e) {
+      toast(`Gagal daftar muka: ${e.message}`);
+    } finally {
+      stopFaceRegistrationCamera();
+      if (dialog.open) dialog.close();
+    }
+  }
   async function refreshDashboard() { const date = $('dashDate').value, occ = Number($('dashOccurrence').value), students = await get('students') || []; const rows = (await get('records') || []).filter(r => r.tarikh === date && r.jenisAktiviti === ACTIVITY && r.perjumpaan === occ); const byId = new Map(rows.map(r => [`${r.nama.toLocaleLowerCase('ms')}|${r.kelas.toLocaleLowerCase('ms')}`, r])); const absent = students.filter(s => !byId.has(id(s)) || byId.get(id(s)).status === 'T').length, present = rows.filter(r => r.status === 'H').length, excused = rows.filter(r => r.status === 'TS').length; $('stats').innerHTML = [['Dijangka', students.length], ['Hadir', present], ['Tidak hadir', absent], ['Dengan sebab', excused]].map(([a, b]) => `<article class="stat"><span class="muted">${a}</span><b>${b}</b></article>`).join(''); }
   async function renderReport() { const year = Number($('reportYear').value), c = $('reportClass').value.toLocaleLowerCase('ms'), students = (await get('students') || []).filter(s => s.kelas.toLocaleLowerCase('ms').includes(c)), records = (await get('records') || []).filter(r => r.tahun === year && r.jenisAktiviti === ACTIVITY); const heads = '<tr><th>Bil</th><th>Nama</th><th>Tingkatan/Kelas</th><th>Aktiviti</th>' + Array.from({ length: 12 }, (_, i) => `<th>${i + 1}</th>`).join('') + '<th>Hadir</th><th>Tidak hadir</th><th>Dengan sebab</th><th>%</th></tr>'; $('reportTable').querySelector('thead').innerHTML = heads; $('reportTable').querySelector('tbody').innerHTML = students.map((s, i) => { const rs = records.filter(r => r.nama.toLocaleLowerCase('ms') === s.nama.toLocaleLowerCase('ms') && r.kelas.toLocaleLowerCase('ms') === s.kelas.toLocaleLowerCase('ms')); const statuses = Array.from({ length: 12 }, (_, j) => rs.find(r => r.perjumpaan === j + 1)?.status || 'â€”'); const sum = U.calculateAttendanceSummary(statuses, 12); return `<tr><td>${i + 1}</td><td>${esc(s.nama)}</td><td>${esc(s.kelas)}</td><td>${ACTIVITY_NAME}</td>${statuses.map(x => `<td>${x}</td>`).join('')}<td>${sum.hadir}</td><td>${sum.tidakHadir}</td><td>${sum.tidakHadirSebab}</td><td>${sum.peratus}%</td></tr>`; }).join(''); }
   function csvParse(text) { return text.trim().split(/\r?\n/).map(line => line.split(',').map(x => x.trim().replace(/^"|"$/g, ''))); }
@@ -60,7 +110,7 @@
   $('startCamera').onclick = startCamera; $('stopCamera').onclick = stopCamera; $('scanSearch').oninput = () => renderScan(); $('studentSearch').oninput = renderStudents; $('studentClassFilter').onchange = renderStudents; $('sendQueue').onclick = syncQueue;
   $('scanResults').onclick = async e => { const b = e.target.closest('[data-mark]'); if (!b) return; const student = (await get('students') || []).find(x => id(x) === b.dataset.id); if (!student) return; let reason = ''; if (b.dataset.mark === 'TS') { reason = await askAbsenceReason(); if (reason === null) return; } await addRecord(student, b.dataset.mark, reason); };
   $('studentForm').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.currentTarget), student = { nama: U.sanitize(f.get('nama')), kelas: U.sanitize(f.get('kelas')), descriptors: [] }; if (!student.nama || !student.kelas) return; const list = await get('students'), old = list.findIndex(x => id(x) === id(student)); if (old >= 0) list[old] = { ...list[old], ...student, descriptors: list[old].descriptors || [] }; else list.push(student); await put('students', list); e.currentTarget.reset(); renderStudents(); toast('Murid disimpan pada peranti.'); };
-  $('studentList').onclick = async e => { const b = e.target.closest('[data-face],[data-deleteface]'); if (!b) return; if (b.dataset.face) return registerFace(b.dataset.face); const list = await get('students'), st = list.find(x => id(x) === b.dataset.deleteface); if (st) { st.descriptors = []; await put('students', list); renderStudents(); toast('Data descriptor muka dipadam.'); } };
+  $('studentList').onclick = async e => { const b = e.target.closest('[data-face],[data-deleteface]'); if (!b) return; if (b.dataset.face) return registerFace(b.dataset.face); const list = await get('students'), st = list.find(x => id(x) === b.dataset.deleteface); if (st) { st.descriptors = []; st.photos = []; await put('students', list); renderStudents(); toast('Data muka dan gambar dipadam.'); } };
   $('importSheet').onchange = async e => { const file = e.target.files[0]; if (!file) return; const rows = csvParse(await file.text()), headers = rows.shift().map(x => x.toLocaleLowerCase('ms')); const ni = headers.findIndex(x => /nama/.test(x)), ci = headers.findIndex(x => /kelas|tingkatan/.test(x)); if (ni < 0 || ci < 0) return toast('CSV perlu mempunyai tajuk Nama dan Kelas.'); const list = await get('students'); let imported = 0; for (const row of rows) { const candidate = { nama: U.sanitize(row[ni]), kelas: U.sanitize(row[ci]) }; if (!candidate.nama || !candidate.kelas) continue; const match = U.matchSheetStudent(candidate, list); if (match) continue; list.push({ ...candidate, kelab: '', quran: '', descriptors: [] }); imported++; } await put('students', list); renderStudents(); toast(`${imported} murid baharu dimuatkan. Padanan dibuat berdasarkan nama dan kelas.`); e.target.value = ''; };
   $('loadSheet').onclick = async () => { const settings = await get('settings'); if (!settings.scriptUrl || !settings.token) return toast('Tetapkan URL dan token Apps Script dahulu.'); try { const res = await fetch(settings.scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ token: settings.token, action: 'students' }) }); const result = await res.json(); if (!res.ok || !result.ok) throw Error(result.error || 'Permintaan gagal'); const local = await get('students'); let added = 0; for (const candidate of result.students) { const match = U.matchSheetStudent(candidate, local); if (!match) { local.push({ ...candidate, descriptors: [] }); added++; } } await put('students', local); renderStudents(); toast(`${added} murid baharu dimuatkan. Padanan nama dan kelas dikekalkan.`); } catch (err) { toast(`Tidak dapat memuatkan Sheet: ${err.message}`); } };
   $('settingsForm').elements.threshold.oninput = e => $('thresholdValue').value = e.target.value;
